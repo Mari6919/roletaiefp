@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Roleta Interativa</title>
+
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f0f0f0;
+  font-family: Arial;
+}
+
+/* FOOTER */
+.footer-bg {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height: 100px;
+  background: url('img/pessoas2030.png') no-repeat center bottom;
+  background-size: contain;
+}
+
+/* LAYOUT */
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5vw;
+}
+
+/* BONECO */
+.boneco-lado {
+  width: 18vw;
+  max-width: 220px;
+  min-width: 120px;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ROLETA */
+canvas {
+  width: 42vw;
+  max-width: 520px;
+  min-width: 300px;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+}
+
+/* POPUPS */
+.popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.popup-content {
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.popup img {
+  max-width: 220px;
+  height: auto;
+}
+
+button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="footer-bg"></div>
+
+<div class="container">
+  <img src="img/boneco.png" class="boneco-lado">
+  <canvas id="roleta"></canvas>
+</div>
+
+<!-- PERGUNTA -->
+<div class="popup" id="popupPergunta">
+  <div class="popup-content">
+    <p id="perguntaTexto"></p>
+    <button onclick="responder(true)">Verdadeiro</button>
+    <button onclick="responder(false)">Falso</button>
+  </div>
+</div>
+
+<!-- PRÉMIO -->
+<div class="popup" id="popupPremio">
+  <div class="popup-content">
+    <h2>🎉 Ganhaste!</h2>
+    <img id="imagemPremio">
+    <br>
+    <button onclick="fecharPremio()">OK</button>
+  </div>
+</div>
+
+<!-- ERRO -->
+<div class="popup" id="popupErro">
+  <div class="popup-content">
+    <h2>❌ Erraste!</h2>
+    <img src="img/bonecoperdeu.png">
+    <br>
+    <button onclick="fecharErro()">OK</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("roleta");
+const ctx = canvas.getContext("2d");
+
+/* CANVAS RESPONSIVO */
+function resizeCanvas() {
+  const size = Math.min(window.innerWidth * 0.42, 520);
+  canvas.width = size;
+  canvas.height = size;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+const opcoes = ["Prémio 1","Prémio 2","Prémio 3","Prémio 4","Prémio 5","Prémio 6"];
+const cores = ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"];
+
+/* 🔥 IMAGENS (AJUSTA EXTENSÕES SE PRECISARES) */
+const imagens = {
+  "Prémio 1": "./img/premio1.jpg",
+  "Prémio 2": "./img/premio1.jpg",
+  "Prémio 3": "./img/premio1.jpg",
+  "Prémio 4": "./img/premio1.jpg",
+  "Prémio 5": "./img/premio1.jpg",
+  "Prémio 6": "./img/premio1.jpg"
+};
+
+/* PERGUNTAS */
+const perguntas = [
+  { t: "O IEFP foi criado em 1976", r: true },
+  { t: "O IEFP só existe em Lisboa", r: false },
+  { t: "O IEFP é um organismo público", r: true },
+  { t: "O IEFP não apoia emprego", r: false }
+];
+
+let rotacao = 0;
+let rodando = false;
+let bloqueado = false;
+let perguntaAtual;
+let premioAtual;
+
+function centro() {
+  return canvas.width / 2;
+}
+
+function raio() {
+  return canvas.width / 2;
+}
+
+const ang = () => (2 * Math.PI) / opcoes.length;
+
+/* DESENHAR ROLETA */
+function desenhar() {
+  const c = centro();
+  const r = raio();
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < opcoes.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(c, c);
+    ctx.arc(c, c, r, ang() * i + rotacao, ang() * (i + 1) + rotacao);
+    ctx.fillStyle = cores[i];
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(c, c);
+    ctx.rotate(ang() * i + ang()/2 + rotacao);
+    ctx.fillStyle = "#000";
+    ctx.font = `${canvas.width * 0.03}px Arial`;
+    ctx.fillText(opcoes[i], r * 0.55, 5);
+    ctx.restore();
+  }
+}
+
+/* RODAR */
+function rodar() {
+  if (rodando || bloqueado) return;
+  rodando = true;
+
+  let v = Math.random() * 0.4 + 0.3;
+
+  function anim() {
+    rotacao += v;
+    v *= 0.97;
+
+    desenhar();
+
+    if (v > 0.002) {
+      requestAnimationFrame(anim);
+    } else {
+      rodando = false;
+      resultado();
+    }
+  }
+
+  anim();
+}
+
+/* RESULTADO */
+function resultado() {
+  let a = rotacao % (2 * Math.PI);
+  a = (a + Math.PI) % (2 * Math.PI);
+
+  let index = Math.floor(
+    (opcoes.length - (a / (2 * Math.PI)) * opcoes.length)
+  ) % opcoes.length;
+
+  if (index < 0) index += opcoes.length;
+
+  premioAtual = opcoes[index];
+  mostrarPergunta();
+}
+
+/* PERGUNTA */
+function mostrarPergunta() {
+  bloqueado = true;
+  perguntaAtual = perguntas[Math.floor(Math.random() * perguntas.length)];
+
+  document.getElementById("perguntaTexto").innerText = perguntaAtual.t;
+  document.getElementById("popupPergunta").style.display = "flex";
+}
+
+/* RESPOSTA */
+function responder(res) {
+  document.getElementById("popupPergunta").style.display = "none";
+
+  if (res === perguntaAtual.r) {
+    const img = document.getElementById("imagemPremio");
+    img.src = imagens[premioAtual];
+
+    /* DEBUG caso falhe */
+    img.onerror = () => {
+      alert("Imagem não encontrada: " + imagens[premioAtual]);
+    };
+
+    document.getElementById("popupPremio").style.display = "flex";
+  } else {
+    document.getElementById("popupErro").style.display = "flex";
+  }
+}
+
+/* FECHAR */
+function fecharPremio() {
+  bloqueado = false;
+  document.getElementById("popupPremio").style.display = "none";
+}
+
+function fecharErro() {
+  bloqueado = false;
+  document.getElementById("popupErro").style.display = "none";
+}
+
+canvas.addEventListener("click", rodar);
+desenhar();
+</script>
+
+</body>
+</html>
